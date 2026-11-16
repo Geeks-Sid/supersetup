@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+mkdir -p "$HOME/.config/nvim"
+ln -f "$REPO_ROOT/dotfiles/.config/nvim/init.vim" "$HOME/.config/nvim/init.vim"
+echo "Linked nvim config"
+
+ln -f "$REPO_ROOT/dotfiles/tmux.conf" "$HOME/.tmux.conf"
+echo "Linked tmux.conf"
+
+ln -f "$REPO_ROOT/dotfiles/vimrc" "$HOME/.vimrc_supersetup"
+echo "Linked vimrc"
+
+# The repo gitconfig carries no identity; keep the one already configured on this machine
+git_name="$(git config --global user.name || true)"
+git_email="$(git config --global user.email || true)"
+ln -f "$REPO_ROOT/dotfiles/gitconfig" "$HOME/.gitconfig"
+if [[ -n "$git_name" ]]; then git config --global user.name "$git_name"; fi
+if [[ -n "$git_email" ]]; then git config --global user.email "$git_email"; fi
+echo "Linked gitconfig"
+
+if [[ -e "$HOME/.zshrc" ]]; then
+    ln -f "$REPO_ROOT/dotfiles/zsh_profile" "$HOME/.zsh_profile"
+    if ! grep --fixed-strings --quiet "source ~/.zsh_profile" "$HOME/.zshrc"; then
+        echo "source ~/.zsh_profile" >> "$HOME/.zshrc"
+    fi
+    echo "Linked zsh_profile and configured zshrc to source it"
+    echo "Restart the terminal for changes to take effect"
+else
+    ln -f "$REPO_ROOT/dotfiles/bash_profile" "$HOME/.bsh_prof"
+    touch "$HOME/.bashrc"
+    if ! grep --fixed-strings --quiet "source ~/.bsh_prof" "$HOME/.bashrc"; then
+        echo "source ~/.bsh_prof" >> "$HOME/.bashrc"
+    fi
+    echo "Linked bash_profile and configured bashrc to source it"
+    echo "Restart the terminal for changes to take effect"
+fi
+
+commands_dir="$REPO_ROOT/dotfiles/commands"
+
+if [[ ! -d "$commands_dir" ]]; then
+    echo "Commands directory not found at $commands_dir" >&2
+else
+    command_snippet="# install-scripts commands
+path_add=\"$commands_dir\"
+if [[ -d \"\$path_add\" && \":\$PATH:\" != *\":\$path_add:\"* ]]; then
+  export PATH=\"\$path_add:\$PATH\"
+fi
+unset path_add
+"
+
+    if [[ -e "$HOME/.zshrc" ]]; then
+        if ! grep --fixed-strings --quiet "$commands_dir" "$HOME/.zshrc"; then
+            printf '%s\n' "$command_snippet" >> "$HOME/.zshrc"
+        fi
+    fi
+
+    if [[ -e "$HOME/.bashrc" ]]; then
+        if ! grep --fixed-strings --quiet "$commands_dir" "$HOME/.bashrc"; then
+            printf '%s\n' "$command_snippet" >> "$HOME/.bashrc"
+        fi
+    fi
+
+    if [[ -n "${ZDOTDIR:-}" && -e "${ZDOTDIR}/.zshrc" ]]; then
+        if ! grep --fixed-strings --quiet "$commands_dir" "${ZDOTDIR}/.zshrc"; then
+            printf '%s\n' "$command_snippet" >> "${ZDOTDIR}/.zshrc"
+        fi
+    fi
+
+    echo "Ensured dotfiles command scripts at $commands_dir are on PATH"
+fi
+
+os_type="${OSTYPE:-$(uname -s | tr '[:upper:]' '[:lower:]')}"
+if [[ "$os_type" == linux* ]]; then
+    echo "Detected linux"
+elif [[ "$os_type" == darwin* ]]; then
+    echo "Detected macOS"
+    # Dynamic Profiles add profiles next to the user's own; the global iTerm2 prefs plist is never replaced
+    mkdir -p "$HOME/Library/Application Support/iTerm2/DynamicProfiles"
+    ln -f "$REPO_ROOT/dotfiles/iterm2_profiles.json" "$HOME/Library/Application Support/iTerm2/DynamicProfiles/supersetup.json"
+    echo "Linked iTerm2 profiles (existing iTerm2 profiles and default left untouched)"
+
+    mkdir -p "$HOME/Library/Application Support/MailMate/Resources/KeyBindings"
+    ln -f "$REPO_ROOT/dotfiles/mailmate_keybindings.plist" "$HOME/Library/Application Support/MailMate/Resources/KeyBindings/MyKBDs.plist"
+    echo "Linked MailMate config"
+
+    mkdir -p "$HOME/Library/Application Support/MailMate/Bundles"
+    cp -r "$REPO_ROOT/dotfiles/mailmate_bundles/"* "$HOME/Library/Application Support/MailMate/Bundles/"
+    echo "Linked MailMate bundles"
+else
+    echo "$os_type"
+    echo "OS not recognized"
+fi

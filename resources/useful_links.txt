@@ -1,0 +1,19 @@
+https://plot.ly/python/getting-started/#installationr
+https://medium.com/@briantorresgil/definitive-guide-to-python-on-mac-osx-65acd8d969d0
+
+https://github.com/ipython-contrib/jupyter_contrib_nbextensions
+https://gorails.com/setup/ubuntu/16.04#git
+
+https://itsfoss.com/install-themes-ubuntu/
+
+for code ({000..255}) print -P -- "$code: %F{$code}This is how your text would look like%f"
+
+https://github.com/EliverLara/terminator-themes/blob/master/themes.md
+https://ryanstutorials.net/bash-scripting-tutorial/bash-if-statements.php
+
+#https://github.com/nejumi/tools_for_kaggle/blob/master/Dockerfile
+git clone --recursive https://github.com/dmlc/xgboost && \
+    cd xgboost && mkdir build && cd build && cmake .. -DPLUGIN_UPDATER_GPU=ON && make -j4 && \
+    cd ../python-package && python3 setup.py install
+
+

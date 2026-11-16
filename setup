@@ -1,0 +1,257 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=setups/assets/apt_install_missing.sh
+source "$REPO_ROOT/setups/assets/apt_install_missing.sh"
+
+1_func() {
+    echo "Installing git, neovim, xclip, ranger and tmux"
+    local os_type
+    os_type="${OSTYPE:-$(uname -s | tr '[:upper:]' '[:lower:]')}"
+    if [[ "$os_type" == darwin* ]]; then
+        echo "Detected macOS"
+        if ! command -v brew >/dev/null 2>&1; then
+            echo "Installing brew"
+            # Official Homebrew installer from https://github.com/Homebrew/install (HEAD)
+            /bin/bash -c "$(curl --fail --silent --show-error --location https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        fi
+        echo "Installing applications"
+        brew install git neovim xclip tmux ranger tmuxinator
+        brew install --cask iterm2
+    elif [[ "$os_type" == linux* ]]; then
+        echo "Detected linux"
+        apt_install_missing git xclip curl tmuxinator
+        bash "$REPO_ROOT/setups/setup_latest_tmux.sh"
+    fi
+    bash "$REPO_ROOT/setups/setup_git.sh"
+}
+
+2_func() {
+    echo "Installing zsh and oh-my-zsh"
+    bash "$REPO_ROOT/setups/setup_zsh.sh"
+
+    echo "Installing Roboto Mono Nerd font"
+    local os_type
+    os_type="${OSTYPE:-$(uname -s | tr '[:upper:]' '[:lower:]')}"
+    if [[ "$os_type" == linux* ]]; then
+        echo "Detected linux"
+        mkdir -p "$HOME/.local/share/fonts"
+        # Roboto Mono Nerd Font Complete Mono from ryanoasis/nerd-fonts (master)
+        curl --fail --silent --show-error --location \
+            --output "$HOME/.local/share/fonts/Roboto Mono Nerd Font Complete Mono.ttf" \
+            "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/RobotoMono/Regular/complete/Roboto%20Mono%20Nerd%20Font%20Complete%20Mono.ttf"
+        # Roboto Mono Nerd Font Complete from ryanoasis/nerd-fonts (master)
+        curl --fail --silent --show-error --location \
+            --output "$HOME/.local/share/fonts/Roboto Mono Nerd Font Complete.ttf" \
+            "https://github.com/ryanoasis/nerd-fonts/raw/master/patched-fonts/RobotoMono/Regular/complete/Roboto%20Mono%20Nerd%20Font%20Complete.ttf"
+        echo "Running fc-cache to recache fonts"
+        fc-cache -vf
+    elif [[ "$os_type" == darwin* ]]; then
+        echo "Detected macOS"
+        brew install --cask font-roboto-mono-nerd-font
+    fi
+}
+
+3_func() {
+    echo "Setting up dotfiles"
+    "$REPO_ROOT/setup_dotfiles"
+}
+
+4_func() {
+    bash "$REPO_ROOT/setups/setup_python.sh"
+}
+
+5_func() {
+    echo "Installing tmux plugins"
+    if [[ ! -d "$HOME/.tmux/plugins/tpm" ]]; then
+        echo "Cloning tmux plugin manager repository"
+        # Tmux Plugin Manager (tpm) from https://github.com/tmux-plugins/tpm (default branch)
+        git clone https://github.com/tmux-plugins/tpm "$HOME/.tmux/plugins/tpm"
+        echo "Installed tmux plugins"
+    fi
+}
+
+6_func() {
+    echo "Installing vim plugins"
+    # vim-plug plugin manager from https://github.com/junegunn/vim-plug (master)
+    curl --fail --silent --show-error --location \
+        --output "$HOME/.vim/autoload/plug.vim" --create-dirs \
+        "https://raw.githubusercontent.com/junegunn/vim-plug/master/plug.vim"
+    vim +PlugInstall +qall </dev/null
+}
+
+8_func() {
+    local os_type
+    os_type="${OSTYPE:-$(uname -s | tr '[:upper:]' '[:lower:]')}"
+    if [[ "$os_type" == darwin* ]]; then
+        # From https://formulae.brew.sh
+        echo "Installing iterm2"
+        brew install --cask iterm2
+        echo "Installing rectangle"
+        brew install --cask rectangle
+        echo "Installing shottr"
+        brew install --cask shottr
+        echo "Installing obsidian"
+        brew install --cask obsidian
+        echo "Installing bitwarden"
+        brew install --cask bitwarden
+        echo "Installing AppCleaner"
+        brew install --cask appcleaner
+        echo "Installing unarchiver"
+        brew install --cask the-unarchiver
+        echo "Installing fzf"
+        brew install fzf
+        echo "Installing mailmate"
+        brew install --cask mailmate
+    fi
+}
+
+9_func() {
+    echo "Installing agent skill packs"
+    bash "$REPO_ROOT/setups/setup_agent_skills.sh"
+}
+
+print_list() {
+    cat <<'EOF'
+ID  Name          Description
+1   core          Initial environment setup and core programs (git, neovim, xclip, tmux, ranger)
+2   zsh           Install zsh, zplugin and nerd-font
+3   dotfiles      Setup dotfiles
+4   python        Install python (conda)
+5   tmux-plugins  Install tmux plugins
+6   vim-plugins   Install vim plugins
+8   macos-apps    Install auxiliary programs (macOS casks and fzf)
+9   agent-skills  Install agent skill packs (omp, Claude Code, Codex, Gemini CLI)
+    all           Run all components in order
+EOF
+}
+
+print_usage() {
+    cat <<'EOF'
+Usage: ./setup [OPTIONS] [COMPONENT...]
+
+Interactive or non-interactive installer for Unix development environment.
+When called with no arguments, displays an interactive menu.
+
+Options:
+  -h, --help    Show this help message and exit
+  -l, --list    List available components (ID, name, description) and exit
+  --all         Run all components in order
+
+Components (specify by ID or name, space- or comma-separated):
+  1, core          Initial environment setup and core programs (git, neovim, xclip, tmux, ranger)
+  2, zsh           Install zsh, zplugin and nerd-font
+  3, dotfiles      Setup dotfiles
+  4, python        Install python (conda)
+  5, tmux-plugins  Install tmux plugins
+  6, vim-plugins   Install vim plugins
+  8, macos-apps    Install auxiliary programs (macOS casks and fzf)
+  9, agent-skills  Install agent skill packs (omp, Claude Code, Codex, Gemini CLI)
+  all              Run all components in order
+
+Environment Variables:
+  GIT_USER_NAME    Git user.name for non-interactive setup_git.sh execution
+  GIT_USER_EMAIL   Git user.email for non-interactive setup_git.sh execution
+  OSTYPE           Platform override (e.g., darwin, linux-gnu)
+
+Examples:
+  ./setup
+  ./setup --list
+  ./setup 3,9
+  ./setup 3 9
+  ./setup dotfiles agent-skills
+  GIT_USER_NAME="Jane Doe" GIT_USER_EMAIL="jane@example.com" ./setup 1
+EOF
+}
+
+print_menu() {
+    echo "Choose components to be installed by comma-separating serial numbers:"
+    echo "1. Initial environment setup and core programs (git, neovim, xclip, tmux, ranger)"
+    echo "2. Install zsh, zplugin and nerd-font"
+    echo "3. Setup dotfiles"
+    echo "4. Install python (conda)"
+    echo "5. Install tmux plugins"
+    echo "6. Install vim plugins"
+    echo "8. Install auxillary programs"
+    echo "9. Install agent skill packs (omp, Claude Code, Codex, Gemini CLI)"
+}
+
+run_task() {
+    local task="$1"
+    case "$task" in
+        1|core)
+            1_func
+            ;;
+        2|zsh)
+            2_func
+            ;;
+        3|dotfiles)
+            3_func
+            ;;
+        4|python)
+            4_func
+            ;;
+        5|tmux-plugins)
+            5_func
+            ;;
+        6|vim-plugins)
+            6_func
+            ;;
+        8|macos-apps)
+            8_func
+            ;;
+        9|agent-skills)
+            9_func
+            ;;
+        all|--all)
+            1_func
+            2_func
+            3_func
+            4_func
+            5_func
+            6_func
+            8_func
+            9_func
+            ;;
+        *)
+            echo "Unknown component: $task" >&2
+            print_usage >&2
+            exit 1
+            ;;
+    esac
+}
+
+run_tasks_from_string() {
+    local input="$1"
+    local token
+    while IFS= read -r token; do
+        if [[ -n "$token" ]]; then
+            run_task "$token"
+        fi
+    done < <(printf '%s\n' "$input" | tr ', \t' '\n')
+}
+
+if [[ $# -gt 0 ]]; then
+    for arg in "$@"; do
+        case "$arg" in
+            -h|--help)
+                print_usage
+                exit 0
+                ;;
+            -l|--list)
+                print_list
+                exit 0
+                ;;
+        esac
+    done
+    for arg in "$@"; do
+        run_tasks_from_string "$arg"
+    done
+else
+    print_menu
+    tasks=""
+    read -r tasks || true
+    run_tasks_from_string "$tasks"
+fi
